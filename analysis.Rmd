@@ -1,0 +1,102 @@
+```{r}
+load("ess.RData")
+```
+
+```{r}
+library(tidyverse)
+library(survey)
+library(DataExplorer)
+library(labelled)
+```
+
+```{r}
+#Obliczenie wag, ludność pobrana z Banku Danych Lokalnych
+ess_weight<-ess %>%
+  mutate(weight = (dweight/nrow(.))*38411148)
+```
+
+```{r}
+#cntry - państwo
+#gndr - płeć
+#polintr - zainteresowanie w politykę
+#trstprl - Trust in country's parliament
+#trstep- Trust in the European Parliament 
+#yrbrn - data urodzenia
+
+variable_list<-c('cntry','gndr','polintr','trstprl','trstep','weight','yrbrn')
+ess_weight %>%
+  select(variable_list) %>%
+plot_missing()
+```
+
+```{r}
+ess_weight$trstprl<-as.numeric(ess_weight$trstprl)
+
+#imputacja
+imp_polintr<- median(ess_weight$polintr, na.rm = TRUE)
+ess_weight <- ess_weight %>%
+  mutate(polintr=if_else(is.na(polintr), imp_polintr, polintr))
+
+
+imp_trstprl<- median(ess_weight$trstprl, na.rm = TRUE)
+ess_weight <- ess_weight %>%
+  mutate(trstprl=if_else(is.na(trstprl), imp_trstprl, trstprl))
+
+imp_trstep<- median(ess_weight$trstep, na.rm = TRUE)
+ess_weight <- ess_weight %>%
+  mutate(trstep=if_else(is.na(trstep), imp_trstep, trstep))
+```
+
+
+```{r}
+ess_weight %>%
+  select(variable_list) %>%
+plot_missing()
+```
+
+```{r}
+ess_selected<-ess_weight %>%
+  select(variable_list)
+```
+
+```{r}
+schemat <-
+ svydesign(
+		id = ~1 ,
+		data = ess_selected ,
+		weight = ~weight ,
+		strata = NULL
+	)
+```
+
+HOW INTERESTED IN POLITICS BY GENDER
+Im mniej tym bardziej zainteresowany, gndr = 1 to mężczyzna
+```{r}
+svyby(formula = ~polintr, by = ~gndr, design = schemat,
+      FUN = svymean, na.rm = TRUE) %>% 
+  mutate(cv=se/polintr)
+```
+TRUST IN COUNTRY'S PARLIAMENT BY GENDER
+Im więcej tym większe zaufanie
+```{r}
+svyby(formula = ~trstprl, by = ~gndr, design = schemat,
+      FUN = svymean, na.rm = TRUE) %>% 
+  mutate(cv=se/trstprl)
+```
+
+TRUST IN THE EUROPEAN PARLIAMENT BY GENDER
+Im więcej tym większe zaufanie
+```{r}
+svyby(formula = ~trstep, by = ~gndr, design = schemat,
+      FUN = svymean, na.rm = TRUE) %>% 
+  mutate(cv=se/trstep)
+```
+
+TRUST IN THE EUROPEAN PARLIAMENT BY YEAR OF BIRTH
+```{r}
+svyby(formula = ~trstep, by = ~yrbrn, design = schemat,
+      FUN = svymean, na.rm = TRUE) %>% 
+  mutate(cv=se/trstep)
+```
+
+
