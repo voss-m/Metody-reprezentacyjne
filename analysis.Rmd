@@ -37,10 +37,7 @@ variable_list<-c('cntry','gndr','polintr','trstprl','trstep','weight','yrbrn')
 ess_weight %>%
   select(variable_list) %>%
 plot_missing(
-  missing_only = TRUE,
-  title = "Missing values",
-  ggtheme = theme_gray(),
-  theme_config = list(legend.position = c("bottom"))
+
 )
 ```
 Sprawdzenie informacji o danych, w których występują braki
@@ -92,6 +89,13 @@ ess_selected<-ess_weight %>%
 ```
 
 ```{r}
+ess_selected<-ess_selected %>%
+  mutate(age=2018-yrbrn)
+```
+
+
+
+```{r}
 schemat <-
  svydesign(
 		id = ~1 ,
@@ -108,6 +112,13 @@ polintr_gndr <- svyby(formula = ~polintr, by = ~gndr, design = schemat,
       FUN = svymean, na.rm = TRUE) %>% 
   mutate(cv=se/polintr)
 ```
+
+```{r}
+polintr_gndr <- svyby(formula = ~polintr, by = ~age, design = schemat,
+      FUN = svymean, na.rm = TRUE) %>% 
+  mutate(cv=se/polintr)
+```
+
 Przedstawienie wyików za pomocą wykresu kolumnowego
 ```{r}
 ggplot(data = polintr_gndr, aes(x = haven::as_factor(gndr),
@@ -191,4 +202,30 @@ ggplot(data=ess_selected, aes(x = haven::as_factor(gndr))) +
   ggtitle("SAMPLE PERSONS BY GENDER") +
   ggsave("SAMPLE PERSONS BY GENDER.png")
 ```
+
+NOWE
+```{r}
+polint_gndr_age<-svyby(formula = ~polintr, ~interaction(gndr,age), design = schemat, data=ess_selected,FUN = svymean)
+```
+
+```{r}
+polint_gndr_age<- as.data.frame(polint_gndr_age)
+polint_gndr_age$`interaction(gndr, age)` <- as.character(polint_gndr_age$`interaction(gndr, age)`)
+
+polint_gndr_age <- polint_gndr_age %>%
+  rename(
+  'interaction_gndr_age'=`interaction(gndr, age)`
+)
+
+polint_gndr_age<-polint_gndr_age %>%
+separate(interaction_gndr_age, c('Gender', 'Age'))
+
+rownames(polint_gndr_age) <- c()
+```
+
+```{r}
+ggplot(data=polint_gndr_age) +
+  geom_smooth(mapping = aes(x = Age, y=polintr, group=1)) 
+```
+
 
