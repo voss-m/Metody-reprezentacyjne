@@ -1,20 +1,29 @@
+Instalacja potrzebnych bibliotek
+```{r}
+install.packages("survey")
+install.packages("tidyverse")
+install.packages("DataExplorer")
+install.packages("labelled")
+install.packages("devtools")
+```
+Załadowanie pliku z danymi
 ```{r}
 load("ess.RData")
 ```
-
+Załadowanie potrzebnych bibliotek
 ```{r}
 library(tidyverse)
 library(survey)
 library(DataExplorer)
 library(labelled)
 ```
-
+Obliczaenie i dodanie do zbioru danych kolumny z wagami uzyskanych na podstawie wag analitycznych
 ```{r}
 #Obliczenie wag, ludność pobrana z Banku Danych Lokalnych
 ess_weight<-ess %>%
   mutate(weight = (dweight/nrow(.))*38411148)
 ```
-
+Analiza braków danych w wybranuch zmiennych
 ```{r}
 #cntry - państwo
 #gndr - płeć
@@ -24,35 +33,58 @@ ess_weight<-ess %>%
 #yrbrn - data urodzenia
 
 variable_list<-c('cntry','gndr','polintr','trstprl','trstep','weight','yrbrn')
+
 ess_weight %>%
   select(variable_list) %>%
-plot_missing()
+plot_missing(
+  missing_only = TRUE,
+  title = "Missing values",
+  ggtheme = theme_gray(),
+  theme_config = list(legend.position = c("bottom"))
+)
 ```
-
+Sprawdzenie informacji o danych, w których występują braki
 ```{r}
-ess_weight$trstprl<-as.numeric(ess_weight$trstprl)
+print(ess_weight$polintr)
+print(ess_weight$trstprl)
+print(ess_weight$trstep)
 
+typeof(ess_weight$polintr)
+typeof(ess_weight$trstprl)
+typeof(ess_weight$trstep)
+```
+Analiza wybranych zmiennych pod względem braków danych pokazała, że w trzech wybranych zmiennych pojawiły się braki danych. Jednakże są one dopuszczalne, by je uzupełnić przeprowdziliśmy w kolejnym etapie inputację danych.
+```{r}
 #imputacja
+
 imp_polintr<- median(ess_weight$polintr, na.rm = TRUE)
+
 ess_weight <- ess_weight %>%
   mutate(polintr=if_else(is.na(polintr), imp_polintr, polintr))
 
 
 imp_trstprl<- median(ess_weight$trstprl, na.rm = TRUE)
 ess_weight <- ess_weight %>%
-  mutate(trstprl=if_else(is.na(trstprl), imp_trstprl, trstprl))
+  mutate(trstprl=if_else(is.na(trstprl), as.numeric(imp_trstprl), as.numeric(trstprl)))
+
 
 imp_trstep<- median(ess_weight$trstep, na.rm = TRUE)
+
 ess_weight <- ess_weight %>%
   mutate(trstep=if_else(is.na(trstep), imp_trstep, trstep))
 ```
-
-
+Kontrolne sprawdzenie, czy pozbyliśmy się braków danych
 ```{r}
 ess_weight %>%
   select(variable_list) %>%
-plot_missing()
+plot_missing(
+  missing_only = FALSE,
+  title = "Missing values",
+  ggtheme = theme_gray(),
+  theme_config = list(legend.position = c("bottom"))
+)
 ```
+
 
 ```{r}
 ess_selected<-ess_weight %>%
@@ -72,31 +104,91 @@ schemat <-
 HOW INTERESTED IN POLITICS BY GENDER
 Im mniej tym bardziej zainteresowany, gndr = 1 to mężczyzna
 ```{r}
-svyby(formula = ~polintr, by = ~gndr, design = schemat,
+polintr_gndr <- svyby(formula = ~polintr, by = ~gndr, design = schemat,
       FUN = svymean, na.rm = TRUE) %>% 
   mutate(cv=se/polintr)
 ```
+Przedstawienie wyików za pomocą wykresu kolumnowego
+```{r}
+ggplot(data = polintr_gndr, aes(x = haven::as_factor(gndr),
+                                y = haven::as_factor(polintr))) +
+  geom_col(fill = cm.colors(2))+
+  ylab("How interested in politics") + 
+  xlab("Gender") +
+  ggtitle("HOW INTERESTED IN POLITICS BY GENDER") +
+  ggsave('HOW INTERESTED IN POLITICS BY GENDER.png')
+```
+
 TRUST IN COUNTRY'S PARLIAMENT BY GENDER
 Im więcej tym większe zaufanie
 ```{r}
-svyby(formula = ~trstprl, by = ~gndr, design = schemat,
+trstprl_gndr <- svyby(formula = ~trstprl, by = ~gndr, design = schemat,
       FUN = svymean, na.rm = TRUE) %>% 
   mutate(cv=se/trstprl)
+```
+```{r}
+ggplot(data = trstprl_gndr, aes(x = haven::as_factor(gndr),
+                                y = haven::as_factor(trstprl))) +
+  geom_col(fill = cm.colors(2))+
+  ylab("Trust in Country's Parliament") + 
+  xlab("Gender") +
+  ggtitle("TRUST IN COUNTRY'S PARLIAMENT BY GENDER") + 
+  ggsave('TRUST IN COUNTRYS PARLIAMENT BY GENDER.png')
 ```
 
 TRUST IN THE EUROPEAN PARLIAMENT BY GENDER
 Im więcej tym większe zaufanie
 ```{r}
-svyby(formula = ~trstep, by = ~gndr, design = schemat,
+trstep_gndr <- svyby(formula = ~trstep, by = ~gndr, design = schemat,
       FUN = svymean, na.rm = TRUE) %>% 
   mutate(cv=se/trstep)
 ```
+```{r}
+ggplot(data = trstep_gndr, aes(x = haven::as_factor(gndr),
+                                y = haven::as_factor(trstep))) +
+  geom_col(fill = cm.colors(2))+
+  ylab("Trust in the European Parliament") + 
+  xlab("Gender") +
+  ggtitle("TRUST IN THE EUROPEAN PARLIAMENT BY GENDER") +
+  ggsave('TRUST IN THE EUROPEAN PARLIAMENT BY GENDER.png')
+```
+
 
 TRUST IN THE EUROPEAN PARLIAMENT BY YEAR OF BIRTH
 ```{r}
-svyby(formula = ~trstep, by = ~yrbrn, design = schemat,
+trstep_yrbrn <- svyby(formula = ~trstep, by = ~yrbrn, design = schemat,
       FUN = svymean, na.rm = TRUE) %>% 
   mutate(cv=se/trstep)
 ```
 
+```{r}
+#ten wykres trzeba poprawić, żeby się tyle etykiet nie wyświetało na osiach
+ggplot(data = trstep_yrbrn, aes(x = haven::as_factor(yrbrn),
+                                y = haven::as_factor(trstep))) +
+  geom_col()+
+  ylab("Trust in the European Parliament") + 
+  xlab("Year of birth") +
+  ggtitle("TRUST IN THE EUROPEAN PARLIAMENT BY YEAR OF BIRTH") +
+  theme_classic() +
+  ggsave('TRUST IN THE EUROPEAN PARLIAMENT BY YEAR OF BIRTH.png')
+
+```
+
+Udział w badaniu ze wględu na rok urodzenia
+```{r}
+#ten wykres trzeba poprawić, żeby się tyle etykiet nie wyświetało na osi X
+ggplot(data=ess_selected, aes(x = haven::as_factor(yrbrn))) +
+  geom_histogram(stat = "count") +
+  xlab("Year of Birth") +
+  ggtitle("SAMPLE PERSONS BY YEAR OF BIRTH") +
+  ggsave("SAMPLE PERSONS BY YEAR OF BIRTH.png")
+```
+Udział w badaniu ze względu na płeć
+```{r}
+ggplot(data=ess_selected, aes(x = haven::as_factor(gndr))) +
+  geom_bar(fill = cm.colors(2)) +
+  xlab("Gender") +
+  ggtitle("SAMPLE PERSONS BY GENDER") +
+  ggsave("SAMPLE PERSONS BY GENDER.png")
+```
 
