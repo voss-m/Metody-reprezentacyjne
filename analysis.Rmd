@@ -36,24 +36,12 @@ variable_list<-c('cntry','gndr','polintr','trstprl','trstep','weight','yrbrn')
 
 ess_weight %>%
   select(variable_list) %>%
-plot_missing(
-
-)
+plot_missing()
 ```
-Sprawdzenie informacji o danych, w których występują braki
-```{r}
-print(ess_weight$polintr)
-print(ess_weight$trstprl)
-print(ess_weight$trstep)
 
-typeof(ess_weight$polintr)
-typeof(ess_weight$trstprl)
-typeof(ess_weight$trstep)
-```
 Analiza wybranych zmiennych pod względem braków danych pokazała, że w trzech wybranych zmiennych pojawiły się braki danych. Jednakże są one dopuszczalne, by je uzupełnić przeprowdziliśmy w kolejnym etapie inputację danych.
 ```{r}
-#imputacja
-
+#Imputacja
 imp_polintr<- median(ess_weight$polintr, na.rm = TRUE)
 
 ess_weight <- ess_weight %>%
@@ -74,12 +62,7 @@ Kontrolne sprawdzenie, czy pozbyliśmy się braków danych
 ```{r}
 ess_weight %>%
   select(variable_list) %>%
-plot_missing(
-  missing_only = FALSE,
-  title = "Missing values",
-  ggtheme = theme_gray(),
-  theme_config = list(legend.position = c("bottom"))
-)
+plot_missing()
 ```
 
 
@@ -89,6 +72,7 @@ ess_selected<-ess_weight %>%
 ```
 
 ```{r}
+#Zamiana roku urodzenia na wiek
 ess_selected<-ess_selected %>%
   mutate(age=2018-yrbrn)
 ```
@@ -96,6 +80,7 @@ ess_selected<-ess_selected %>%
 
 
 ```{r}
+#Ustalenie schematu losowania z wykorzystaniem wcześniej obliczonych wag
 schemat <-
  svydesign(
 		id = ~1 ,
@@ -113,6 +98,7 @@ polintr_gndr <- svyby(formula = ~polintr, by = ~gndr, design = schemat,
   mutate(cv=se/polintr)
 ```
 
+HOW INTERESTED IN POLITICS BY GENDER AND AGE
 ```{r}
 polintr_gndr <- svyby(formula = ~polintr, by = ~age, design = schemat,
       FUN = svymean, na.rm = TRUE) %>% 
@@ -203,29 +189,43 @@ ggplot(data=ess_selected, aes(x = haven::as_factor(gndr))) +
   ggsave("SAMPLE PERSONS BY GENDER.png")
 ```
 
-NOWE
+
 ```{r}
+#Policzenie średniego zainteresowania polityką ze względu na wiek i płeć
 polint_gndr_age<-svyby(formula = ~polintr, ~interaction(gndr,age), design = schemat, data=ess_selected,FUN = svymean)
 ```
 
 ```{r}
+#Ustawienie danych jako data frame
 polint_gndr_age<- as.data.frame(polint_gndr_age)
+#Zmiana typu danych kolumny 
 polint_gndr_age$`interaction(gndr, age)` <- as.character(polint_gndr_age$`interaction(gndr, age)`)
 
+#Zmiana nazwy kolumny
 polint_gndr_age <- polint_gndr_age %>%
   rename(
   'interaction_gndr_age'=`interaction(gndr, age)`
 )
 
+#Rozdzielenie kolumny interaction_gnder_age na dwie kolumny
 polint_gndr_age<-polint_gndr_age %>%
 separate(interaction_gndr_age, c('Gender', 'Age'))
 
+#Usunięcie nazw wierszy
 rownames(polint_gndr_age) <- c()
 ```
 
 ```{r}
+#Funkcja, która przyjmuje wartość na wejściu. Co podana wartość będzie wyświetlana na wykresie
+ every_nth = function(n) {
+  return(function(x) {x[c(TRUE, rep(FALSE, n - 1))]})
+}
+
 ggplot(data=polint_gndr_age) +
-  geom_smooth(mapping = aes(x = Age, y=polintr, group=1)) 
+  geom_smooth(mapping = aes(x = Age, y=polintr, group=1)) +
+  facet_grid(~Gender) +
+   scale_x_discrete(breaks = every_nth(n = 5))
+  
 ```
 
 
